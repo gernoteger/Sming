@@ -104,10 +104,6 @@ export PATH := $(ESP_HOME)/xtensa-lx106-elf/bin:$(PATH)
 XTENSA_TOOLS_ROOT := $(ESP_HOME)/xtensa-lx106-elf/bin
 
 SPIFF_FILES ?= files
-# spiffs input directory and output size
-SPIFF_FILES ?= spiffs
-SPIFF_SIZE  ?= 458752
-
 
 BUILD_BASE	= out/build
 FW_BASE		= out/firmware
@@ -132,29 +128,6 @@ EXTRA_INCDIR    ?= include $(SMING_HOME)/include $(SMING_HOME)/ $(SMING_HOME)/sy
 USER_LIBDIR = $(SMING_HOME)/compiler/lib/
 LIBS		= microc microgcc hal phy pp net80211 lwip wpa main sming $(EXTRA_LIBS)
 
-# libraries used in this project, mainly provided by the SDK
-USER_LIBDIRS = $(SMING_HOME)/compiler/lib/ $(BUILD_BASE)
-
-#rBoot filenames
-
-# filenames and options for generating rom images with esptool2
-
-FW_SECTS = .text .data .rodata
-FW_USER_ARGS = -quiet -bin -boot2
-FW_ROM_0 = rom0
-FW_ROM_1 = rom1
-
-# spiffs output filename
-SPIFFS = spiffs
-
-
-FW_ROM_0  := $(addprefix $(FW_BASE)/,$(FW_ROM_0).bin)
-FW_ROM_1  := $(addprefix $(FW_BASE)/,$(FW_ROM_1).bin)
-
-SPIFFS    := $(addprefix $(FW_BASE)/,$(SPIFFS).bin)
-
-
-
 # compiler flags using during compilation of source files
 CFLAGS		= -Os -g -Wpointer-arith -Wundef -Werror -Wl,-EL -nostdlib -mlongcalls -mtext-section-literals -finline-functions -fdata-sections -ffunction-sections -D__ets__ -DICACHE_FLASH -DARDUINO=106
 CXXFLAGS	= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++11 -felide-constructors
@@ -171,12 +144,6 @@ endif
 ifeq ($(DISABLE_SPIFFS), 1)
 	CFLAGS += -DDISABLE_SPIFFS=1
 endif
-ifdef RBOOT_BUILD_SMING
-	CFLAGS += -DRBOOT_BUILD_SMING
-endif
-
-
-
 
 # linker flags used to generate the main object file
 LDFLAGS		= -nostdlib -u call_user_start -Wl,-static -Wl,--gc-sections -Wl,-Map=$(FW_BASE)/firmware.map
@@ -184,15 +151,6 @@ LDFLAGS		= -nostdlib -u call_user_start -Wl,-static -Wl,--gc-sections -Wl,-Map=$
 # linker script used for the above linkier step
 LD_PATH     = $(SMING_HOME)/compiler/ld/
 LD_SCRIPT	= $(LD_PATH)eagle.app.v6.cpp.ld
-
-#same for rboot
-# linker flags used to generate the main object file
-LDFLAGS_0		= -nostdlib -u call_user_start -u Cache_Read_Enable_New -Wl,-static -Wl,--gc-sections -Wl,-Map=$(basename $@).map
-
-# linker script used for the above linker step
-LD_SCRIPT_0 = rom0.ld
-LD_SCRIPT_1 = rom1.ld
-
 
 ifeq ($(SPI_SPEED), 26)
 	flashimageoptions = -ff 26m
@@ -251,10 +209,6 @@ SDK_LIBDIR	= lib
 SDK_LDDIR	= ld
 SDK_INCDIR	= include
 
-
-LIBMAIN = $(addprefix $(SDK_LIBDIR)/,libmain.a)
-LIBMAIN2 = $(addprefix $(BUILD_BASE)/,libmain2.a)
-
 # select which tools to use as compiler, librarian and linker
 CC		:= $(XTENSA_TOOLS_ROOT)/xtensa-lx106-elf-gcc
 CXX		:= $(XTENSA_TOOLS_ROOT)/xtensa-lx106-elf-g++
@@ -277,14 +231,6 @@ OBJ		:= $(patsubst %.o,$(BUILD_BASE)/%.o,$(CXX_OBJ))
 LIBS		:= $(addprefix -l,$(LIBS))
 APP_AR		:= $(addprefix $(BUILD_BASE)/,$(TARGET)_app.a)
 TARGET_OUT	:= $(addprefix $(BUILD_BASE)/,$(TARGET).out)
-
-# and rboot...
-TARGET_OUT_0	:= $(addprefix $(BUILD_BASE)/,$(TARGET)_0.out)
-TARGET_OUT_1	:= $(addprefix $(BUILD_BASE)/,$(TARGET)_1.out)
-
-LD_SCRIPT_0	:= $(addprefix -T,$(LD_SCRIPT_0))
-LD_SCRIPT_1	:= $(addprefix -T,$(LD_SCRIPT_1))
-
 
 SPIFF_BIN_OUT := $(FW_BASE)/spiff_rom.bin
 LD_SCRIPT	:= $(addprefix -T,$(LD_SCRIPT))
@@ -314,69 +260,11 @@ $1/%.o: %.cpp
 	$(Q) $(CXX) $(INCDIR) $(MODULE_INCDIR) $(EXTRA_INCDIR) $(SDK_INCDIR) $(CXXFLAGS) -c $$< -o $$@
 endef
 
-.PHONY: all checkdirs spiff_update spiff_clean clean all_rboot
+.PHONY: all checkdirs spiff_update spiff_clean clean
 
 all: checkdirs $(TARGET_OUT) $(SPIFF_BIN_OUT) $(FW_FILE_1) $(FW_FILE_2)
 
-
-# single rom image for rBoot big flash support and 1mb slots
-all_rboot: checkdirs $(LIBMAIN2) $(FW_ROM_0) $(SPIFFS)
-
-# dual rom images for rBoot without big flash support and/or two smaller rom slots
-#all_rboot: checkdirs $(LIBMAIN2) $(FW_ROM_0) $(FW_ROM_1) $(SPIFFS)
-
-$(SPIFFS):
-	@echo "SP $@"
-	@$(SPIFFY) $(SPIFF_SIZE) $(SPIFF_FILES)
-	@mv spiff_rom.bin $(SPIFFS)
-	
-$(LIBMAIN2): $(LIBMAIN)
-	@echo "OC $@"
-	@$(OBJCOPY) -W Cache_Read_Enable_New $^ $@
-
-	
-$(FW_ROM_0): $(TARGET_OUT_0)
-	@echo "E2 $@"
-	@echo $(ESPTOOL2) $(FW_USER_ARGS) $(TARGET_OUT_0) $@ $(FW_SECTS)
-	@$(ESPTOOL2) $(FW_USER_ARGS) $(TARGET_OUT_0) $@ $(FW_SECTS)
-
-$(FW_ROM_1): $(TARGET_OUT_1)
-	@echo "E2 $@"
-	@$(ESPTOOL2) $(FW_USER_ARGS) $(TARGET_OUT_1) $@ $(FW_SECTS)
-
-
 spiff_update: spiff_clean $(SPIFF_BIN_OUT)
-
-###############################
-$(TARGET_OUT_0): $(APP_AR)
-	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) $(LD_SCRIPT_0) $(LDFLAGS_0) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
-
-###TODO: avoid copy/paste? with target meminfor??
-	$(vecho) "#Memory / Section info:"	
-	$(vecho) "------------------------------------------------------------------------------"
-#Check for existing old meminfo file and move it to /out/firmware as the infofile from previous build
-	$(Q) if [ -f "$(FW_MEMINFO_SAVED)" ]; then \
-	  mv $(FW_MEMINFO_SAVED) $(FW_MEMINFO_OLD); \
-	fi
-	
-	$(Q) $(MEMANALYZER) $@ > $(FW_MEMINFO_NEW)
-	
-	$(Q) if [[ -f "$(FW_MEMINFO_NEW)" && -f "$(FW_MEMINFO_OLD)" ]]; then \
-	  awk -F "|" 'FILENAME == "$(FW_MEMINFO_OLD)" { arr[$$1]=$$5 } FILENAME == "$(FW_MEMINFO_NEW)" { if (arr[$$1] != $$5){printf "%s%s%+d%s", substr($$0, 1, length($$0) - 1)," (",$$5 - arr[$$1],")\n" } else {print $$0} }' $(FW_MEMINFO_OLD) $(FW_MEMINFO_NEW); \
-	elif [ -f "$(FW_MEMINFO_NEW)" ]; then \
-	  cat $(FW_MEMINFO_NEW); \
-	fi
-
-	$(vecho) "------------------------------------------------------------------------------"
-	$(vecho) "# Generating image..."
-	$(Q) $(ESPTOOL) elf2image $@ $(flashimageoptions) -o $(FW_BASE)/
-	$(vecho) "Generate firmware images successully in folder $(FW_BASE)."
-	$(vecho) "Done"
-
-$(TARGET_OUT_1): $(APP_AR)
-	@echo "LD $@"
-	@$(LD) -L$(USER_LIBDIR) -L$(SDK_LIBDIR) $(LD_SCRIPT_1) $(LDFLAGS_0) -Wl,--start-group $(APP_AR) $(LIBS) -Wl,--end-group -o $@
 
 $(TARGET_OUT): $(APP_AR)
 	$(vecho) "LD $@"	
