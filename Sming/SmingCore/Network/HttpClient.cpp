@@ -62,7 +62,10 @@ bool HttpClient::startDownload(URL uri, HttpClientMode mode, HttpClientCompleted
 	if (uri.Protocol != "http") return false;
 	debugf("Download: %s", uri.toString().c_str());
 
-	connect(uri.Host, uri.Port);
+	//allow persistent connections!
+	if(!isProcessing()){
+		connect(uri.Host, uri.Port);
+	}
 	bool isPost = body.length();
 
 	sendString((isPost ? "POST " : "GET ") + uri.getPathWithQuery() + " HTTP/1.0\r\nHost: " + uri.Host + "\r\n");
