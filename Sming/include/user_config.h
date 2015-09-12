@@ -36,7 +36,6 @@ extern "C" {
 	// Beta boards
 	#define BOARD_ESP01
 
-	#define DISABLE_SPIFFS
 #ifdef __cplusplus
 }
 #endif

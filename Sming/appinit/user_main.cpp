@@ -5,12 +5,7 @@ extern void init();
 
 extern "C" void  __attribute__((weak)) user_init(void)
 {
-	//system_update_cpu_freq(80);
-	
 	system_timer_reinit();
-
-	debugf("1");
-
 	uart_div_modify(UART_ID_0, UART_CLK_FREQ / 115200);
 	cpp_core_initialize();
 	System.initialize();
