@@ -6,4 +6,6 @@ This directory contains (unit-)tests for Sming. Currently It's only used for som
 Usage: 
 
 1. cd into the makefile subdirectory
-2. `make tests` 
+1. `make tests` 
+
+# Stale branch!! the solution of raburton in #279 (simply not needing SMING_HOME) is preferable over mine. what's left there would be probably remove all references to SMING_HOME inside the Makefile...
