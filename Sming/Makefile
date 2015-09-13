@@ -32,19 +32,26 @@
 # Com port speed
 COM_SPEED = 115200
 
+MAKEFILE_DIR:= $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+SMING_HOME ?=$(MAKEFILE_DIR)
 
 ifeq ($(OS),Windows_NT)
   # Windows detected
   UNAME := Windows
   
+  define fixpath
+	$(0)=$(subst \,/,$(addprefix /,$(subst :,,$(1))))
+  endef
+  
   # Default SMING_HOME. Can be overriden.
-  SMING_HOME ?= c:\tools\Sming\Sming
+  SMING_HOME ?= c:\tools\Sming\Sming1
 
   # Default ESP_HOME. Can be overriden.
   ESP_HOME ?= c:\Espressif
 
   # Making proper path adjustments - replace back slashes, remove colon and add forward slash.
-  SMING_HOME := $(subst \,/,$(addprefix /,$(subst :,,$(SMING_HOME))))
+  #TODO: fix properly
+  SMING_HOME := $(subst //,/,$(subst \,/,$(addprefix /,$(subst :,,$(SMING_HOME)))))
   ESP_HOME := $(subst \,/,$(addprefix /,$(subst :,,$(ESP_HOME))))
   include Makefile-windows.mk  
 else
